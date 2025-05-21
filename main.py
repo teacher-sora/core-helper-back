@@ -9,6 +9,7 @@ from itertools import combinations, permutations
 import numpy as np
 import cv2
 import os
+import gc
 import math
 
 app = FastAPI()
@@ -265,7 +266,11 @@ def parse_core_skills(core_skills, selected_job_class_path):
       # 강화 코어 테두리 추가
       canvas = apply_border(canvas)
       core_skills.append((canvas, combo_file_names))
+
+      del combo_images
+      del canvas
     
+    gc.collect()
     return core_skills
 
   # 매칭되는 이미지를 찾는 함수
@@ -311,9 +316,15 @@ def parse_core_skills(core_skills, selected_job_class_path):
   for core_skill in core_skills:
     matched_core_skill_index = find_matching_image(core_skill, generated_core_skill_images)
 
-    if matched_core_skill_index:
+    if matched_core_skill_index is not None:
       parsed_core_skills.append(generated_core_skill_names[matched_core_skill_index])
 
+  # 메모리 해제
+  del generated_core_skills
+  del generated_core_skill_images
+  del generated_core_skill_names
+
+  gc.collect()
   return parsed_core_skills
 
 def find_combinations(core_skills, selected_skills):
