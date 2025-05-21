@@ -98,7 +98,7 @@ def get_decompose_tab(display, template):
   th, tw = gray_template.shape
 
   # 만약 display 크기가 template 보다 작을 경우 스킵
-  if (dh * dw) < (th * tw):
+  if (dw < tw) or (dh < th):
     return None
 
   # 분해 탭과 매칭
