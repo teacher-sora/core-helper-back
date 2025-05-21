@@ -48,6 +48,10 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
 
     for display in displays:
       decompose_tab = get_decompose_tab(display, decompose_tab_template)
+      
+      if decompose_tab is None:
+        continue
+
       cores = get_cores(decompose_tab, empty_core_template)
       enhanced_cores = get_enhanced_cores(cores)
       core_skills = get_core_skills(enhanced_cores)
@@ -89,6 +93,13 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
 def get_decompose_tab(display, template):
   gray_display = cv2.cvtColor(display, cv2.COLOR_BGR2GRAY)
   gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+
+  dh, dw = gray_display.shape
+  th, tw = gray_template.shape
+
+  # 만약 display 크기가 template 보다 작을 경우 스킵
+  if (dh * dw) < (th * tw):
+    return None
 
   # 분해 탭과 매칭
   result = cv2.matchTemplate(gray_display, gray_template, cv2.TM_CCOEFF_NORMED)

@@ -1,0 +1,10 @@
+# flyctl launch added from .gitignore
+# Python bytecode
+__pycache__
+*.py[cod]
+
+# Virtual environment
+venv
+.env
+
+fly.toml
