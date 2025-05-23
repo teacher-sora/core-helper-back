@@ -92,8 +92,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     traceback.print_exc()
 
     return JSONResponse(status_code=500, content={
-      "success": False,
-      "message": "분석 도중 문제가 발생했어요."
+      "success": False
     })
 
 def get_decompose_tab(display, template):
