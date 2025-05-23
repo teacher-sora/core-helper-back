@@ -82,7 +82,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     gc.collect()
 
     image_time = time.time()
-    print(f"경과 시간[이미지 처리]: {image_time - start_time:.3f}초")
+    print(f"경과 시간[이미지 처리]: {image_time - generate_time:.3f}초")
 
     if len(core_skill_names) == 0:
       return JSONResponse(content={
