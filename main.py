@@ -12,6 +12,8 @@ import os
 import gc
 import math
 
+import time
+
 app = FastAPI()
 
 app.add_middleware(
@@ -29,6 +31,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.post("/core-helper/")
 async def core_helper(images: list[UploadFile] = File(...), selected_job_class: str = Form(...), selected_skills: list[str] = Form(...)):
   try:
+    print(f"요청 - 직업: [{selected_job_class}], 이미지: [{len(images)}], 스킬: [{len(selected_skills)}]")
+    start_time = time.time()
+
     displays = []
 
     for image in images:
@@ -47,26 +52,39 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     empty_core_template = cv2.imread(os.path.join(base_path, "templates", "empty-core.png"))
 
     generated_core_skills = generate_core_skills(selected_job_class_path)
+
+    generate_time = time.time()
+    print(f"경과 시간[코어 생성]: {generate_time - start_time:.3f}초")
+
     core_skill_names = []
 
     for display in displays:
       decompose_tab = get_decompose_tab(display, decompose_tab_template)
-      
       if decompose_tab is None:
         continue
 
       cores = get_cores(decompose_tab, empty_core_template)
+      if len(cores) == 0:
+        continue
+
       enhanced_cores = get_enhanced_cores(cores)
+      if len(enhanced_cores) == 0:
+        continue
+
       core_skills = get_core_skills(enhanced_cores)
+      if len(core_skills) == 0:
+        continue
 
       # 분석해서 이름만 저장함 [[스킬1, 스킬2, 스킬3], . . .]
       parsed_core_skills = parse_core_skills(core_skills, generated_core_skills)
-
       if len(parsed_core_skills) > 0:
         core_skill_names.extend(parsed_core_skills)
 
     del generated_core_skills
     gc.collect()
+
+    image_time = time.time()
+    print(f"경과 시간[이미지 처리]: {image_time - start_time:.3f}초")
 
     if len(core_skill_names) == 0:
       return JSONResponse(content={
@@ -75,6 +93,12 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
       })
 
     combinations = find_combinations(core_skill_names, selected_skills)
+
+    combination_time = time.time()
+    print(f"경과 시간[조합 검색]: {combination_time - start_time:.3f}초")
+
+    end_time = time.time()
+    print(f"소요 시간: {end_time - start_time:.3f}초")
 
     if len(combinations) == 0:
       return JSONResponse(content={
