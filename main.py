@@ -26,12 +26,10 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# TODO: 2중첩, 3중첩 선택할 수 있게 만들기
-
 @app.post("/core-helper/")
-async def core_helper(images: list[UploadFile] = File(...), selected_job_class: str = Form(...), selected_skills: list[str] = Form(...)):
+async def core_helper(images: list[UploadFile] = File(...), selected_job_class: str = Form(...)):
   try:
-    print(f"요청 - 직업: [{selected_job_class}], 이미지: [{len(images)}], 스킬: [{len(selected_skills)}]")
+    print(f"요청 - 직업: [{selected_job_class}], 이미지: [{len(images)}]")
     start_time = time.time()
 
     displays = []
@@ -92,23 +90,12 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
         "message": "이미지에서 쓸만한 코어가 발견되지 않았어요.\n다시 한번 확인해 주세요."
       })
 
-    combinations = find_combinations(core_skill_names, selected_skills)
-
-    combination_time = time.time()
-    print(f"경과 시간[조합 검색]: {combination_time - start_time:.3f}초")
-
     end_time = time.time()
     print(f"소요 시간: {end_time - start_time:.3f}초")
 
-    if len(combinations) == 0:
-      return JSONResponse(content={
-        "success": False,
-        "message": "현재 보유한 코어로는 조합이 어려워요.\n조금 더 코어를 모아주세요."
-      })
-
     return JSONResponse(content={
       "success": True,
-      "combinations": combinations
+      "core_skill_names": core_skill_names
     })
   
   except Exception as e:
@@ -359,103 +346,3 @@ def parse_core_skills(core_skills, generated_core_skills):
 
   gc.collect()
   return parsed_core_skills
-
-def find_combinations(core_skills, selected_skills):
-  selected_skills_length = len(selected_skills)
-
-  # 메인 스킬들만 인덱싱
-  main_skill_indices = defaultdict(list)
-
-  # { A스킬: [1, 5], B스킬: [2, 3, 4], . . . }
-  for idx, core_skill in enumerate(core_skills):
-    main_skill_indices[core_skill[0]].append(idx)
-
-  # [A스킬, B스킬, . . .]
-  all_main_skills = list(main_skill_indices.keys())
-
-  min_case_count = math.ceil(2 * selected_skills_length / 3)
-  max_case_count = min(2 * selected_skills_length, len(all_main_skills)) + 1
-
-  valid_combinations = []
-  min_len = float('inf')
-
-  # 선택한 스킬들이 2중첩이 될 수 있는 경우만큼 반복
-  for count in range(min_case_count, max_case_count):
-    for main_skill_combo in combinations(all_main_skills, count):
-      # 이미 코어를 찾은 경우 탈출하기 위함
-      if count >= min_len:
-        break
-
-      unique_combinations = [[]]
-
-      # 메인 스킬이 중복되지 않도록 코어 스킬 조합을 생성
-      for main_skill in main_skill_combo:
-        new_combos = []
-
-        for prev in unique_combinations:
-          for idx in main_skill_indices[main_skill]:
-            # [[1], [5]]
-            # [[1, 2], [1, 3], [1, 4], [5, 2], [5, 3], [5, 4]]
-            # [[1, 2, . . .], [1, 3, . . .], . . .]
-            new_combos.append(prev + [idx])
-
-        unique_combinations = new_combos
-
-      # 조건에 맞는 조합만 추출
-      for unique_combo in unique_combinations:
-        skill_counter = Counter()
-
-        # 조합 속 코어 스킬들의 스킬 카운팅
-        for idx in unique_combo:
-          skill_counter.update(core_skills[idx])
-
-        # 선택한 모든 스킬이 2중첩 이상일 경우
-        if all(skill_counter[selected_skill] >= 2 for selected_skill in selected_skills):
-          if len(unique_combo) < min_len:
-            min_len = len(unique_combo)
-            valid_combinations = [unique_combo]
-          elif len(unique_combo) == min_len:
-            valid_combinations.append(unique_combo)
-          else:
-            # 2중첩이 될 수 있는 조합 중
-            # 코어의 개수가 최소로 필요한 경우가 이미 있으므로 종료
-            break
-
-  # 유효 조합이 없는 경우 종료
-  if len(valid_combinations) == 0:
-    return []
-
-  exp_per_core = 50
-  level_exp_requirements = [0, 55, 125, 210, 310, 425, 555, 700, 860, 1035, 1225, 1430, 1650, 1885, 2135, 2400, 2680, 2975, 3285, 3610, 3950, 4305, 4675, 5060, 5460]
-
-  # 각 코어들의 레벨 총합
-  total_core_levels = []
-
-  # 텍스트 형식의 코어 조합
-  valid_name_combinations = []
-
-  for valid_combination in valid_combinations:
-    total_core_level = 0
-    valid_name_combination = [core_skills[core_skill_index] for core_skill_index in valid_combination]
-    main_skills = [skill_names[0] for skill_names in valid_name_combination]
-
-    for main_skill in main_skills:
-      count = len(main_skill_indices[main_skill])
-      core_exp = count * exp_per_core
-
-      # 해당 코어가 최대 몇 레벨인지 계산
-      for idx, level_exp_requirement in enumerate(level_exp_requirements):
-        if core_exp <= level_exp_requirement:
-          total_core_level += idx
-          break
-
-    total_core_levels.append(total_core_level)
-    valid_name_combinations.append(valid_name_combination)
-
-  max_level = max(total_core_levels)
-  top_level_combination_index = total_core_levels.index(max_level)
-  
-  # 레벨을 가장 높게 강화할 수 있는 코어 조합
-  final_combinations = valid_name_combinations[top_level_combination_index]
-
-  return final_combinations
