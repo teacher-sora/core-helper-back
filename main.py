@@ -24,6 +24,8 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# TODO: 2중첩, 3중첩 선택할 수 있게 만들기
+
 @app.post("/core-helper/")
 async def core_helper(images: list[UploadFile] = File(...), selected_job_class: str = Form(...), selected_skills: list[str] = Form(...)):
   try:
@@ -44,6 +46,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     decompose_tab_template = cv2.imread(os.path.join(base_path, "templates", "decompose-tab.png"))
     empty_core_template = cv2.imread(os.path.join(base_path, "templates", "empty-core.png"))
 
+    generated_core_skills = generate_core_skills(selected_job_class_path)
     core_skill_names = []
 
     for display in displays:
@@ -57,10 +60,13 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
       core_skills = get_core_skills(enhanced_cores)
 
       # 분석해서 이름만 저장함 [[스킬1, 스킬2, 스킬3], . . .]
-      parsed_core_skills = parse_core_skills(core_skills, selected_job_class_path)
+      parsed_core_skills = parse_core_skills(core_skills, generated_core_skills)
 
       if len(parsed_core_skills) > 0:
         core_skill_names.extend(parsed_core_skills)
+
+    del generated_core_skills
+    gc.collect()
 
     if len(core_skill_names) == 0:
       return JSONResponse(content={
@@ -214,77 +220,84 @@ def get_core_skills(enhanced_cores):
 
   return core_skills
 
-def parse_core_skills(core_skills, selected_job_class_path):
-  # 코어 스킬을 생성하는 함수
-  def generate_core_skills(skills):
-    # 테두리를 추가하는 함수
-    def apply_border(core_skill):
-      color = [221, 221, 204]
-      white = [255, 255, 255]
+def generate_core_skills(selected_job_class_path):
+  def apply_border(core_skill):
+    color = [221, 221, 204]
+    white = [255, 255, 255]
 
-      for x in range(1, 31):
-        core_skill[1, x] = color
-        core_skill[30, x] = color
-        core_skill[2, x] = white
-        core_skill[29, x] = white
-      for y in range(2, 30):
-        core_skill[y, 1] = color
-        core_skill[y, 30] = color
-        core_skill[y, 2] = white
-        core_skill[y, 29] = white
+    for x in range(1, 31):
+      core_skill[1, x] = color
+      core_skill[30, x] = color
+      core_skill[2, x] = white
+      core_skill[29, x] = white
+    for y in range(2, 30):
+      core_skill[y, 1] = color
+      core_skill[y, 30] = color
+      core_skill[y, 2] = white
+      core_skill[y, 29] = white
 
-      return core_skill
+    return core_skill
 
-    core_skills = []
-    size = 32
+  # 직업 스킬들 수집
+  job_class_skills = []
 
-    images, file_names = zip(*skills)
-    resized_images = []
+  # zipped(스킬 이미지, 스킬 이름)
+  for file_name in os.listdir(selected_job_class_path):
+    if file_name.lower().endswith(".png"):
+      path = os.path.join(selected_job_class_path, file_name)
+      image = cv2.imread(path)
+      job_class_skills.append((image, file_name[:-4]))
 
-    # 스킬 이미지들을 32, 32로 만들기
-    for image in images:
-      image = cv2.resize(image, (size, size))
-      resized_images.append(image)
+  generated_core_skills = []
+  size = 32
+
+  images, file_names = zip(*job_class_skills)
+  resized_images = []
+
+  # 스킬 이미지들을 32, 32로 만들기
+  for image in images:
+    image = cv2.resize(image, (size, size))
+    resized_images.append(image)
+  
+  skills = list(zip(resized_images, file_names))
+
+  # 코어 스킬의 삼각형 마스크 생성
+  triangle_mask = np.zeros((size, size), dtype=np.uint8)
+  pts = np.array([[0, 0], [31, 0], [16, 16]], np.int32)
+  pts = pts.reshape((-1, 1, 2))
+  cv2.fillPoly(triangle_mask, [pts], 255)
+
+  # 코어 스킬 생성
+  combination_skills = permutations(skills, 3)
+  for combo_skill in combination_skills:
+    combo_images, combo_file_names = zip(*combo_skill)
+    canvas = np.zeros_like(combo_images[0])
+
+    # 중앙(삼각형)에 이미지 배치
+    for center in range(3):
+      canvas[:, :, center] = np.where(triangle_mask == 255, combo_images[1][:, :, center], canvas[:, :, center])
+
+    # 좌우에 이미지 배치
+    for y in range(size):
+      for x in range(size):
+        # 중앙(삼각형)이 아닐 경우
+        if triangle_mask[y, x] == 0:
+          if x < 16:
+            canvas[y, x] = combo_images[0][y, x]
+          else:
+            canvas[y, x] = combo_images[2][y, x]
     
-    skills = list(zip(resized_images, file_names))
+    # 강화 코어 테두리 추가
+    canvas = apply_border(canvas)
+    generated_core_skills.append((canvas, combo_file_names))
 
-    # 코어 스킬의 삼각형 마스크 생성
-    triangle_mask = np.zeros((size, size), dtype=np.uint8)
-    pts = np.array([[0, 0], [31, 0], [16, 16]], np.int32)
-    pts = pts.reshape((-1, 1, 2))
-    cv2.fillPoly(triangle_mask, [pts], 255)
+    del combo_images
+    del canvas
+  
+  gc.collect()
+  return generated_core_skills
 
-    # 코어 스킬 생성
-    combination_skills = permutations(skills, 3)
-    for combo_skill in combination_skills:
-      combo_images, combo_file_names = zip(*combo_skill)
-      canvas = np.zeros_like(combo_images[0])
-
-      # 중앙(삼각형)에 이미지 배치
-      for center in range(3):
-        canvas[:, :, center] = np.where(triangle_mask == 255, combo_images[1][:, :, center], canvas[:, :, center])
-
-      # 좌우에 이미지 배치
-      for y in range(size):
-        for x in range(size):
-          # 중앙(삼각형)이 아닐 경우
-          if triangle_mask[y, x] == 0:
-            if x < 16:
-              canvas[y, x] = combo_images[0][y, x]
-            else:
-              canvas[y, x] = combo_images[2][y, x]
-      
-      # 강화 코어 테두리 추가
-      canvas = apply_border(canvas)
-      core_skills.append((canvas, combo_file_names))
-
-      del combo_images
-      del canvas
-    
-    gc.collect()
-    return core_skills
-
-  # 매칭되는 이미지를 찾는 함수
+def parse_core_skills(core_skills, generated_core_skills):
   def find_matching_image(core_skill, generated_core_skill_images):
     size = 32
     core_skill = cv2.resize(core_skill, (size, size))
@@ -306,20 +319,7 @@ def parse_core_skills(core_skills, selected_job_class_path):
     # 가장 유사도가 높은 만들어진 코어 스킬 번호 반환
     return vals.index(max(vals))
 
-  # ---------------------- 여기서부터 본문
-  # 직업 스킬들 수집
-  job_class_skills = []
-
-  # zipped(스킬 이미지, 스킬 이름)
-  for file_name in os.listdir(selected_job_class_path):
-    if file_name.lower().endswith(".png"):
-      path = os.path.join(selected_job_class_path, file_name)
-      image = cv2.imread(path)
-      job_class_skills.append((image, file_name[:-4]))
-
-  # 모든 조합의 코어 스킬 생성
   # zipped(코어 스킬 이미지, 코어 스킬 이름)
-  generated_core_skills = generate_core_skills(job_class_skills)
   generated_core_skill_images, generated_core_skill_names = zip(*generated_core_skills)
 
   # 넘겨받은 코어 스킬들 분석
@@ -331,7 +331,6 @@ def parse_core_skills(core_skills, selected_job_class_path):
       parsed_core_skills.append(generated_core_skill_names[matched_core_skill_index])
 
   # 메모리 해제
-  del generated_core_skills
   del generated_core_skill_images
   del generated_core_skill_names
 
@@ -360,6 +359,10 @@ def find_combinations(core_skills, selected_skills):
   # 선택한 스킬들이 2중첩이 될 수 있는 경우만큼 반복
   for count in range(min_case_count, max_case_count):
     for main_skill_combo in combinations(all_main_skills, count):
+      # 이미 코어를 찾은 경우 탈출하기 위함
+      if count >= min_len:
+        break
+
       unique_combinations = [[]]
 
       # 메인 스킬이 중복되지 않도록 코어 스킬 조합을 생성
