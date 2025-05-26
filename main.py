@@ -56,7 +56,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
 
     core_skill_names = []
 
-    for display in displays:
+    for idx, display in enumerate(displays):
       decompose_tab = get_decompose_tab(display, decompose_tab_template)
       if decompose_tab is None:
         continue
@@ -69,7 +69,8 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
       if len(enhanced_cores) == 0:
         continue
 
-      core_skills = get_core_skills(enhanced_cores)
+      is_display_media =  "display-media" in images[idx].filename
+      core_skills = get_core_skills(enhanced_cores, is_display_media)
       if len(core_skills) == 0:
         continue
 
@@ -84,14 +85,15 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     image_time = time.time()
     print(f"경과 시간[이미지 처리]: {image_time - generate_time:.3f}초")
 
+    end_time = time.time()
+    print(f"소요 시간: {end_time - start_time:.3f}초")
+
     if len(core_skill_names) == 0:
       return JSONResponse(content={
         "success": False,
         "message": "이미지에서 쓸만한 코어가 발견되지 않았어요.\n다시 한번 확인해 주세요."
       })
 
-    end_time = time.time()
-    print(f"소요 시간: {end_time - start_time:.3f}초")
 
     return JSONResponse(content={
       "success": True,
@@ -151,8 +153,8 @@ def get_cores(decompose_tab, template):
     epsilon = 0.02 * cv2.arcLength(cnt, True)
     approx = cv2.approxPolyDP(cnt, epsilon, True)
 
-    # 5 ~ 9각형인지 체크
-    if 5 <= len(approx) <= 9:
+    # 각이 5개가 넘는지 체크
+    if 5 <= len(approx):
       x, y, w, h = cv2.boundingRect(approx)
       aspect_ratio = w / h
 
@@ -203,15 +205,21 @@ def get_enhanced_cores(cores):
 
   return enhanced_cores
 
-def get_core_skills(enhanced_cores):
+def get_core_skills(enhanced_cores, is_display_media):
   core_skills = []
 
   for idx, enhanced_core in enumerate(enhanced_cores):
     hsv = cv2.cvtColor(enhanced_core, cv2.COLOR_BGR2HSV)
-    color = np.array([0, 0, 0])
+
+    if is_display_media:
+      dark_color = np.array([60, 255, 0])
+      light_color = np.array([150, 255, 10])
+    else:
+      dark_color = np.array([0, 0, 0])
+      light_color = np.array([0, 0, 0])
 
     # 스킬 테두리색으로 마스킹
-    masked = cv2.inRange(hsv, color, color)
+    masked = cv2.inRange(hsv, dark_color, light_color)
 
     # 윤곽선 검출
     contours, _ = cv2.findContours(masked, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
