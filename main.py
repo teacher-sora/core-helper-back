@@ -54,15 +54,12 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     generate_time = time.time()
     print(f"경과 시간[코어 생성]: {generate_time - start_time:.3f}초")
 
-    decompose_tabs = []
     core_skill_names = []
 
     for display in displays:
       decompose_tab = get_decompose_tab(display, decompose_tab_template)
       if decompose_tab is None:
         continue
-      else:
-        decompose_tabs.extend(decompose_tab)
 
       cores = get_cores(decompose_tab, empty_core_template)
       if len(cores) == 0:
@@ -86,12 +83,6 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
 
     image_time = time.time()
     print(f"경과 시간[이미지 처리]: {image_time - generate_time:.3f}초")
-
-    if len(decompose_tabs) == 0:
-      return JSONResponse(content={
-        "success": False,
-        "message": "이미지에서 코어 분해 탭을 발견하지 못했어요.\n다시 한번 확인해 주세요."
-      })
 
     if len(core_skill_names) == 0:
       return JSONResponse(content={
@@ -128,11 +119,7 @@ def get_decompose_tab(display, template):
 
   # 분해 탭과 매칭
   result = cv2.matchTemplate(gray_display, gray_template, cv2.TM_CCOEFF_NORMED)
-  _, max_val, _, max_loc = cv2.minMaxLoc(result)
-
-  # 코어 분해 탭이 아닐 것 같은 경우에 return
-  if max_val < 0.3:
-    return None
+  _, _, _, max_loc = cv2.minMaxLoc(result)
 
   # 매칭된 영역 좌표 가져오기
   h, w = gray_template.shape
