@@ -211,7 +211,7 @@ def get_core_skills(enhanced_cores):
     hsv = cv2.cvtColor(enhanced_core, cv2.COLOR_BGR2HSV)
 
     dark_color = np.array([0, 0, 0])
-    light_color = np.array([175, 255, 25])
+    light_color = np.array([175, 255, 50])
 
     # 스킬 테두리색으로 마스킹
     masked = cv2.inRange(hsv, dark_color, light_color)
