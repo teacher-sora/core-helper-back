@@ -56,7 +56,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
 
     core_skill_names = []
 
-    for idx, display in enumerate(displays):
+    for display in displays:
       decompose_tab = get_decompose_tab(display, decompose_tab_template)
       if decompose_tab is None:
         continue
@@ -69,8 +69,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
       if len(enhanced_cores) == 0:
         continue
 
-      is_display_media =  "display-media" in images[idx].filename
-      core_skills = get_core_skills(enhanced_cores, is_display_media)
+      core_skills = get_core_skills(enhanced_cores)
       if len(core_skills) == 0:
         continue
 
@@ -205,18 +204,14 @@ def get_enhanced_cores(cores):
 
   return enhanced_cores
 
-def get_core_skills(enhanced_cores, is_display_media):
+def get_core_skills(enhanced_cores):
   core_skills = []
 
   for idx, enhanced_core in enumerate(enhanced_cores):
     hsv = cv2.cvtColor(enhanced_core, cv2.COLOR_BGR2HSV)
 
-    if is_display_media:
-      dark_color = np.array([60, 255, 0])
-      light_color = np.array([150, 255, 10])
-    else:
-      dark_color = np.array([0, 0, 0])
-      light_color = np.array([0, 0, 0])
+    dark_color = np.array([0, 0, 0])
+    light_color = np.array([175, 255, 25])
 
     # 스킬 테두리색으로 마스킹
     masked = cv2.inRange(hsv, dark_color, light_color)
