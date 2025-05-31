@@ -57,12 +57,17 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
 
     core_skill_names = []
 
-    decompose_tabs = get_decompose_tabs(displays)
+    # decompose_tabs = get_decompose_tabs(displays)
 
     model_time = time.time()
     print(f"경과 시간[모델 실행]: {model_time - generate_time:.3f}초")
 
-    for decompose_tab in decompose_tabs:
+    # for decompose_tab in decompose_tabs:
+    for display in displays:
+      decompose_tab = get_decompose_tab(display, decompose_tab_template)
+      if decompose_tab is None:
+        continue
+
       cores = get_cores(decompose_tab, empty_core_template)
       if len(cores) == 0:
         continue
@@ -109,6 +114,30 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     return JSONResponse(status_code=500, content={
       "success": False
     })
+
+def get_decompose_tab(display, template):
+  gray_display = cv2.cvtColor(display, cv2.COLOR_BGR2GRAY)
+  gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+
+  dh, dw = gray_display.shape
+  th, tw = gray_template.shape
+
+  # 만약 display 크기가 template 보다 작을 경우 스킵
+  if (dw < tw) or (dh < th):
+    return None
+
+  # 분해 탭과 매칭
+  result = cv2.matchTemplate(gray_display, gray_template, cv2.TM_CCOEFF_NORMED)
+  _, _, _, max_loc = cv2.minMaxLoc(result)
+
+  # 매칭된 영역 좌표 가져오기
+  h, w = gray_template.shape
+  top_left = max_loc
+  bottom_right = (top_left[0] + w, top_left[1] + h)
+
+  # 매칭된 영역 추출
+  cropped = display[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
+  return cropped
 
 def get_decompose_tabs(displays):
   model_path = "models/get-decompose-tab.pt"
