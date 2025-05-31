@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from ultralytics import YOLO
 from collections import defaultdict, Counter
 from itertools import combinations, permutations
 
@@ -56,11 +57,12 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
 
     core_skill_names = []
 
-    for display in displays:
-      decompose_tab = get_decompose_tab(display, decompose_tab_template)
-      if decompose_tab is None:
-        continue
+    decompose_tabs = get_decompose_tabs(displays)
 
+    model_time = time.time()
+    print(f"경과 시간[모델 실행]: {model_time - generate_time:.3f}초")
+
+    for decompose_tab in decompose_tabs:
       cores = get_cores(decompose_tab, empty_core_template)
       if len(cores) == 0:
         continue
@@ -78,14 +80,15 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
       if len(parsed_core_skills) > 0:
         core_skill_names.extend(parsed_core_skills)
 
+    del decompose_tabs
     del generated_core_skills
     gc.collect()
 
-    image_time = time.time()
-    print(f"경과 시간[이미지 처리]: {image_time - generate_time:.3f}초")
+    parse_time = time.time()
+    print(f"경과 시간[이미지 분석]: {parse_time - model_time:.3f}초")
 
     end_time = time.time()
-    print(f"소요 시간: {end_time - start_time:.3f}초")
+    print(f"소요 시간: {end_time - start_time:.3f}초, 분석된 코어의 수: {len(core_skill_names)}")
 
     if len(core_skill_names) == 0:
       return JSONResponse(content={
@@ -107,29 +110,21 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
       "success": False
     })
 
-def get_decompose_tab(display, template):
-  gray_display = cv2.cvtColor(display, cv2.COLOR_BGR2GRAY)
-  gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+def get_decompose_tabs(displays):
+  model_path = "models/get-decompose-tab.pt"
+  model = YOLO(model_path)
+  results = model.predict(source=displays, verbose=False)
 
-  dh, dw = gray_display.shape
-  th, tw = gray_template.shape
+  decompose_tabs = []
+  for result in results:
+    img = result.orig_img
+    boxes = result.boxes.xyxy.cpu().numpy()
+    for box in boxes:
+      x1, y1, x2, y2 = map(int, box)
+      cropped = img[y1:y2, x1:x2]
+      decompose_tabs.append(cropped)
 
-  # 만약 display 크기가 template 보다 작을 경우 스킵
-  if (dw < tw) or (dh < th):
-    return None
-
-  # 분해 탭과 매칭
-  result = cv2.matchTemplate(gray_display, gray_template, cv2.TM_CCOEFF_NORMED)
-  _, _, _, max_loc = cv2.minMaxLoc(result)
-
-  # 매칭된 영역 좌표 가져오기
-  h, w = gray_template.shape
-  top_left = max_loc
-  bottom_right = (top_left[0] + w, top_left[1] + h)
-
-  # 매칭된 영역 추출
-  cropped = display[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
-  return cropped
+  return decompose_tabs
 
 def get_cores(decompose_tab, template):
   cores = []

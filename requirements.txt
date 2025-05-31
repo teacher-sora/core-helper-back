@@ -3,3 +3,4 @@ numpy
 python-multipart
 opencv-python-headless
 uvicorn[standard]
+ultralytics==8.3.146
