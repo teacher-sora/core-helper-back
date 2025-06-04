@@ -58,18 +58,22 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     icons = []
     for display in displays:
       cores = find_core_candidates(display)
+      # print(f"cores: {len(cores)}")
       if not cores:
         continue
 
       enhanced_cores = extract_enhanced_core_candidates(cores)
+      # print(f"enhanced_cores: {len(enhanced_cores)}")
       if not enhanced_cores:
         continue
 
       core_icons = extract_core_icon_candidates(enhanced_cores)
+      # print(f"core_icons: {len(core_icons)}")
       if not core_icons:
         continue
 
       valid_core_icons = filter_valid_core_icons(core_icons)
+      # print(f"valid_core_icons: {len(valid_core_icons)}")
       if valid_core_icons:
         icons.extend(valid_core_icons)
 
@@ -99,7 +103,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
       return JSONResponse(content={
         "success": True,
         "core_skill_names": detected_cores
-      })  
+      })
   except Exception as e:
     import traceback
     traceback.print_exc()
@@ -175,7 +179,7 @@ def extract_enhanced_core_candidates(cores):
 def extract_core_icon_candidates(cores):
   size = 32
   lower_color = np.array([0, 0, 0])
-  upper_color = np.array([175, 255, 50])
+  upper_color = np.array([175, 255, 40])
 
   core_icon_candidates = []
   for core in cores:
