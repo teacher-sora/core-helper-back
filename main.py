@@ -179,7 +179,7 @@ def extract_enhanced_core_candidates(cores):
 def extract_core_icon_candidates(cores):
   size = 32
   lower_color = np.array([0, 0, 0])
-  upper_color = np.array([175, 255, 40])
+  upper_color = np.array([175, 255, 50])
 
   core_icon_candidates = []
   for core in cores:
@@ -207,10 +207,10 @@ def filter_valid_core_icons(icons):
     masked = cv2.inRange(hsv, lower_color, upper_color)
     edges = np.concatenate([masked[0, :], masked[-1, :], masked[:, 0], masked[:, -1]])
 
-    # 스킬 후보(모서리에 흰색이 94 ~ 120)
+    # 스킬 후보(모서리에 흰색이 62 ~ 124)
     counter = Counter()
     counter.update(map(str, edges))
-    if 94 <= counter["255"] <= 120:
+    if 62 <= counter["255"] <= 124:
       core_icons.append(icon)
   return core_icons
 
