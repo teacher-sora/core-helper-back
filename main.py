@@ -118,8 +118,9 @@ def get_job_skills(job_class_path):
     if file_name.lower().endswith(".png"):
       path = os.path.join(job_class_path, file_name)
       icon = cv2.imread(path)
+      outlined_icon = outline_icon(icon)
       name = file_name[:-4]
-      skills.append({"icon": icon, "name": name})
+      skills.append({"icon": outlined_icon, "name": name})
   return skills
 
 def find_core_candidates(display):
@@ -214,6 +215,44 @@ def filter_valid_core_icons(icons):
       core_icons.append(icon)
   return core_icons
 
+def outline_icon(icon):
+  size = 32
+  icon = cv2.resize(icon, (size, size))
+
+  outer_color = [221, 221, 204]
+  inner_color = [255, 255, 255]
+  border_color = [0, 0, 0]
+
+  def draw_horizontal(y, color):
+    icon[y, 1:31] = color
+
+  def draw_vertical(x, color):
+    icon[2:30, x] = color
+
+  # 바깥 테두리
+  draw_horizontal(1, outer_color)   # 위
+  draw_horizontal(30, outer_color)  # 아래
+
+  # 안쪽 테두리
+  draw_horizontal(2, inner_color)   # 위
+  draw_horizontal(29, inner_color)  # 아래
+
+  # 바깥 테두리
+  draw_vertical(1, outer_color)     # 왼쪽
+  draw_vertical(30, outer_color)    # 오른쪽
+
+  # 안쪽 테두리
+  draw_vertical(2, inner_color)     # 왼쪽
+  draw_vertical(29, inner_color)    # 오른쪽
+
+  # 외곽 경계선
+  icon[0, 0:32] = border_color       # 최상단
+  icon[31, 0:32] = border_color      # 최하단
+  icon[0:32, 0] = border_color       # 최좌측
+  icon[0:32, 31] = border_color      # 최우측
+
+  return icon
+
 def split_icon(icon):
   size = 32
   icon = cv2.resize(icon, (size, size))
@@ -274,8 +313,9 @@ def analyze_icon(icon, skills):
   skill_parts = [skill["icon"] for skill in matched_skills]
   skill_names = [skill["name"] for skill in matched_skills]
   merged_icon = merge_icon_parts(skill_parts)
+  outlined_icon = outline_icon(merged_icon)
 
-  result = cv2.matchTemplate(icon, merged_icon, cv2.TM_CCOEFF_NORMED)
+  result = cv2.matchTemplate(icon, outlined_icon, cv2.TM_CCOEFF_NORMED)
   _, max_val, _, _ = cv2.minMaxLoc(result)
 
   detected_skill_names = skill_names if max_val > 0.5 else []
