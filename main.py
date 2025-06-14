@@ -83,7 +83,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
       del valid_core_icons
       gc.collect()
     find_cores = time.time()
-    print(f"경과 시간[코어 탐색]: {find_cores - start_time:.3f}초, 탐색된 아이콘: {len(icons)}")
+    print(f"경과 시간[코어 탐색]: {find_cores - start_time:.3f}초, 탐색된 코어: {len(icons)}개")
 
     detected_cores = []
     for icon in icons:
