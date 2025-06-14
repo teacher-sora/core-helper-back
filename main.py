@@ -83,7 +83,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
       del valid_core_icons
       gc.collect()
     find_cores = time.time()
-    print(f"경과 시간[코어 탐색]: {find_cores - start_time:.3f}초")
+    print(f"경과 시간[코어 탐색]: {find_cores - start_time:.3f}초, 탐색된 코어: {len(find_cores)}")
 
     detected_cores = []
     for icon in icons:
@@ -91,8 +91,8 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
       if detected_skill_names:
         detected_cores.append(detected_skill_names)
     analyze_cores = time.time()
-    print(f"경과 시간[코어 분석]: {analyze_cores - find_cores:.3f}초")
-    print(f"소요 시간: {analyze_cores - start_time:.3f}초, 분석된 코어: {len(detected_cores)}개")
+    print(f"경과 시간[코어 분석]: {analyze_cores - find_cores:.3f}초, 분석된 코어: {len(detected_cores)}개")
+    print(f"소요 시간: {analyze_cores - start_time:.3f}초")
 
     if not detected_cores:
       return JSONResponse(content={
