@@ -124,10 +124,12 @@ def get_job_skills(job_class_path):
   return skills
 
 def find_core_candidates(display):
-  lower_color = np.array([0, 0, 0])
-  upper_color = np.array([50, 50, 50])
+  hsv = cv2.cvtColor(display, cv2.COLOR_BGR2HSV)
 
-  masked = cv2.inRange(display, lower_color, upper_color)
+  lower_color = np.array([0, 0, 0])
+  upper_color = np.array([175, 255, 50])
+
+  masked = cv2.inRange(hsv, lower_color, upper_color)
   contours, _ = cv2.findContours(masked, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
   core_candidates = []
@@ -177,12 +179,14 @@ def extract_enhanced_core_candidates(cores):
 
 def extract_core_icon_candidates(cores):
   size = 32
+
   lower_color = np.array([0, 0, 0])
-  upper_color = np.array([50, 50, 50])
+  upper_color = np.array([175, 255, 50])
 
   core_icon_candidates = []
   for core in cores:
-    masked = cv2.inRange(core, lower_color, upper_color)
+    hsv = cv2.cvtColor(core, cv2.COLOR_BGR2HSV)
+    masked = cv2.inRange(hsv, lower_color, upper_color)
     contours, _ = cv2.findContours(masked, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
       continue
