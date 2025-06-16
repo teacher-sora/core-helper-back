@@ -74,7 +74,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
 
       valid_core_icons = filter_valid_core_icons(core_icons)
       # print(f"valid_core_icons: {len(valid_core_icons)}")
-      if valid_core_icons:
+      if len(valid_core_icons) > 0:
         icons.extend(valid_core_icons)
 
       del cores
@@ -88,7 +88,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     detected_cores = []
     for icon in icons:
       detected_skill_names = analyze_icon(icon, skills)
-      if detected_skill_names:
+      if len(detected_skill_names) > 0:
         detected_cores.append(detected_skill_names)
     analyze_cores = time.time()
     print(f"경과 시간[코어 분석]: {analyze_cores - find_cores:.3f}초, 분석된 코어: {len(detected_cores)}개")
@@ -201,11 +201,12 @@ def extract_core_icon_candidates(cores):
 
 def filter_valid_core_icons(icons):
   lower_color = np.array([0, 0, 0])
-  upper_color = np.array([50, 50, 50])
+  upper_color = np.array([175, 255, 50])
 
   core_icons = []
   for icon in icons:
-    masked = cv2.inRange(icon, lower_color, upper_color)
+    hsv = cv2.cvtColor(icon, cv2.COLOR_BGR2HSV)
+    masked = cv2.inRange(hsv, lower_color, upper_color)
     edges = np.concatenate([masked[0, :], masked[-1, :], masked[:, 0], masked[:, -1]])
 
     # 스킬 후보(모서리에 흰색이 62 ~ 124)
