@@ -73,7 +73,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
 
       valid_core_icons = filter_valid_core_icons(core_icons)
       # print(f"valid_core_icons: {len(valid_core_icons)}")
-      if len(valid_core_icons) > 0:
+      if valid_core_icons:
         icons.extend(valid_core_icons)
 
       del cores
@@ -87,7 +87,7 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     detected_cores = []
     for icon in icons:
       detected_skill_names = analyze_icon(icon, skills)
-      if len(detected_skill_names) > 0:
+      if detected_skill_names:
         detected_cores.append(detected_skill_names)
     analyze_cores = time.time()
     print(f"경과 시간[코어 분석]: {analyze_cores - find_cores:.3f}초, 분석된 코어: {len(detected_cores)}개")
@@ -301,7 +301,11 @@ def analyze_icon(icon, skills):
   matched_skills = []
   for icon_part in icon_parts:
     match_results = []
-    for i, skill in enumerate(skills):
+    for skill in skills:
+      if matched_skills:
+        skill_names = [skill["name"] for skill in matched_skills]
+        if skill["name"] in skill_names:
+          continue
       masked = mask_icon(icon_part, skill["icon"])
       result = cv2.matchTemplate(icon_part, masked, cv2.TM_CCOEFF_NORMED)
       _, max_val, _, _ = cv2.minMaxLoc(result)
@@ -320,5 +324,5 @@ def analyze_icon(icon, skills):
   result = cv2.matchTemplate(icon, outlined_icon, cv2.TM_CCOEFF_NORMED)
   _, max_val, _, _ = cv2.minMaxLoc(result)
 
-  detected_skill_names = skill_names if max_val > 0.5 else []
+  detected_skill_names = skill_names if max_val > 0.7 else []
   return detected_skill_names
