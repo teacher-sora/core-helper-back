@@ -16,6 +16,10 @@ primary_region = 'nrt'
   min_machines_running = 0
   processes = ['app']
 
+  read_timeout = "300s"
+  write_timeout = "300s"
+  idle_timeout = "300s"
+
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
