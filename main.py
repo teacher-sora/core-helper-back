@@ -34,7 +34,7 @@ async def health():
 @app.post("/core-helper/")
 async def core_helper(images: list[UploadFile] = File(...), selected_job_class: str = Form(...)):
   try:
-    processed = await asyncio.wait_for(process(images, selected_job_class), timeout=12.5)
+    processed = await asyncio.wait_for(process(images, selected_job_class), timeout=300.0)
     if processed.get("message") is not None:
       return JSONResponse(content={
           "success": processed.get("success", False),
