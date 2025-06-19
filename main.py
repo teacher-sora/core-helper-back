@@ -116,7 +116,7 @@ async def process(images: list[UploadFile] = File(...), selected_job_class: str 
   if not detected_cores:
     return {
       "success": False,
-      "message": "이미지에서 쓸만한 코어가 발견되지 않았어요.\n다시 한번 확인해 주세요."
+      "message": "화질이 낮으면 인식이 잘 안 돼요.\n조금 더 높은 화질의 사진을 이용해 주세요."
     }
   else:
     return {
