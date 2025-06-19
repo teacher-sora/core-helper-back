@@ -10,6 +10,7 @@ import cv2
 import os
 import gc
 import math
+import asyncio
 
 import time
 
@@ -33,76 +34,22 @@ async def health():
 @app.post("/core-helper/")
 async def core_helper(images: list[UploadFile] = File(...), selected_job_class: str = Form(...)):
   try:
-    start_time = time.time()
-    print(f"요청 - 직업: [{selected_job_class}], 이미지: [{len(images)}]")
-
-    # 경로 설정
-    base_path = "static"
-    job_class_path = os.path.join(base_path, "skills", selected_job_class)
-    skills = get_job_skills(job_class_path)
-
-    displays = []
-    for image in images:
-      content = await image.read()
-      np_img = np.frombuffer(content, np.uint8)
-
-      display = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
-      displays.append(display)
-
-      del content
-      del np_img
-      del display
-      gc.collect()
-
-    icons = []
-    for display in displays:
-      cores = find_core_candidates(display)
-      # print(f"cores: {len(cores)}")
-      if not cores:
-        continue
-
-      enhanced_cores = extract_enhanced_core_candidates(cores)
-      # print(f"enhanced_cores: {len(enhanced_cores)}")
-      if not enhanced_cores:
-        continue
-
-      core_icons = extract_core_icon_candidates(enhanced_cores)
-      # print(f"core_icons: {len(core_icons)}")
-      if not core_icons:
-        continue
-
-      valid_core_icons = filter_valid_core_icons(core_icons)
-      # print(f"valid_core_icons: {len(valid_core_icons)}")
-      if valid_core_icons:
-        icons.extend(valid_core_icons)
-
-      del cores
-      del enhanced_cores
-      del core_icons
-      del valid_core_icons
-      gc.collect()
-    find_cores = time.time()
-    print(f"경과 시간[코어 탐색]: {find_cores - start_time:.3f}초, 탐색된 코어: {len(icons)}개")
-
-    detected_cores = []
-    for icon in icons:
-      detected_skill_names = analyze_icon(icon, skills)
-      if detected_skill_names:
-        detected_cores.append(detected_skill_names)
-    analyze_cores = time.time()
-    print(f"경과 시간[코어 분석]: {analyze_cores - find_cores:.3f}초, 분석된 코어: {len(detected_cores)}개")
-    print(f"소요 시간: {analyze_cores - start_time:.3f}초")
-
-    if not detected_cores:
+    processed = await asyncio.wait_for(process(images, selected_job_class), timeout=12.5)
+    if processed.get("message") is not None:
       return JSONResponse(content={
-        "success": False,
-        "message": "이미지에서 쓸만한 코어가 발견되지 않았어요.\n다시 한번 확인해 주세요."
+          "success": processed.get("success", False),
+          "message": processed.get("message", "")
       })
-    else:
+    elif processed.get("core_skill_names") is not None:
       return JSONResponse(content={
-        "success": True,
-        "core_skill_names": detected_cores
+          "success": processed.get("success", False),
+          "core_skill_names": processed.get("core_skill_names", [])
       })
+  except asyncio.TimeoutError:
+    return JSONResponse(content={
+      "success": False,
+      "message": "요청 시간이 초과되었습니다."
+    })
   except Exception as e:
     import traceback
     traceback.print_exc()
@@ -110,6 +57,78 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
     return JSONResponse(status_code=500, content={
       "success": False
     })
+
+async def process(images: list[UploadFile] = File(...), selected_job_class: str = Form(...)):
+  start_time = time.time()
+  print(f"요청 - 직업: [{selected_job_class}], 이미지: [{len(images)}]")
+
+  # 경로 설정
+  base_path = "static"
+  job_class_path = os.path.join(base_path, "skills", selected_job_class)
+  skills = get_job_skills(job_class_path)
+
+  displays = []
+  for image in images:
+    content = await image.read()
+    np_img = np.frombuffer(content, np.uint8)
+
+    display = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+    displays.append(display)
+
+    del content
+    del np_img
+    del display
+    gc.collect()
+
+  icons = []
+  for display in displays:
+    cores = find_core_candidates(display)
+    # print(f"cores: {len(cores)}")
+    if not cores:
+      continue
+
+    enhanced_cores = extract_enhanced_core_candidates(cores)
+    # print(f"enhanced_cores: {len(enhanced_cores)}")
+    if not enhanced_cores:
+      continue
+
+    core_icons = extract_core_icon_candidates(enhanced_cores)
+    # print(f"core_icons: {len(core_icons)}")
+    if not core_icons:
+      continue
+
+    valid_core_icons = filter_valid_core_icons(core_icons)
+    # print(f"valid_core_icons: {len(valid_core_icons)}")
+    if valid_core_icons:
+      icons.extend(valid_core_icons)
+
+    del cores
+    del enhanced_cores
+    del core_icons
+    del valid_core_icons
+    gc.collect()
+  find_cores = time.time()
+  print(f"경과 시간[코어 탐색]: {find_cores - start_time:.3f}초, 탐색된 코어: {len(icons)}개")
+
+  detected_cores = []
+  for icon in icons:
+    detected_skill_names = analyze_icon(icon, skills)
+    if detected_skill_names:
+      detected_cores.append(detected_skill_names)
+  analyze_cores = time.time()
+  print(f"경과 시간[코어 분석]: {analyze_cores - find_cores:.3f}초, 분석된 코어: {len(detected_cores)}개")
+  print(f"소요 시간: {analyze_cores - start_time:.3f}초")
+
+  if not detected_cores:
+    return {
+      "success": False,
+      "message": "이미지에서 쓸만한 코어가 발견되지 않았어요.\n다시 한번 확인해 주세요."
+    }
+  else:
+    return {
+      "success": True,
+      "core_skill_names": detected_cores
+    }
 
 def get_job_skills(job_class_path):
   skills = []
@@ -180,7 +199,7 @@ def extract_enhanced_core_candidates(cores):
       enhanced_core_candidates.append(core)
   return enhanced_core_candidates
 
-def extract_core_icon_candidates(cores, upper_color = np.array([180, 255, 50])):
+def extract_core_icon_candidates(cores, upper_color = np.array([180, 255, 60])):
   size = 32
 
   lower_color = np.array([0, 0, 0])
@@ -203,7 +222,7 @@ def extract_core_icon_candidates(cores, upper_color = np.array([180, 255, 50])):
     core_icon_candidates.append(crop)
   return core_icon_candidates
 
-def filter_valid_core_icons(icons, upper_color = np.array([180, 255, 50])):
+def filter_valid_core_icons(icons, upper_color = np.array([180, 255, 60])):
   lower_color = np.array([0, 0, 0])
 
   core_icons = []
