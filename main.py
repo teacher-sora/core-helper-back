@@ -67,21 +67,12 @@ async def process(images: list[UploadFile] = File(...), selected_job_class: str 
   job_class_path = os.path.join(base_path, "skills", selected_job_class)
   skills = get_job_skills(job_class_path)
 
-  displays = []
+  icons = []
   for image in images:
     content = await image.read()
     np_img = np.frombuffer(content, np.uint8)
-
     display = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
-    displays.append(display)
 
-    del content
-    del np_img
-    del display
-    gc.collect()
-
-  icons = []
-  for display in displays:
     cores = find_core_candidates(display)
     # print(f"cores: {len(cores)}")
     if not cores:
@@ -106,6 +97,9 @@ async def process(images: list[UploadFile] = File(...), selected_job_class: str 
     del enhanced_cores
     del core_icons
     del valid_core_icons
+    del content
+    del np_img
+    del display
     gc.collect()
   find_cores = time.time()
   print(f"경과 시간[코어 탐색]: {find_cores - start_time:.3f}초, 탐색된 코어: {len(icons)}개")
