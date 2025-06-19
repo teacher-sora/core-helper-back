@@ -122,9 +122,9 @@ def get_job_skills(job_class_path):
       skills.append({"icon": outlined_icon, "name": name})
   return skills
 
-def find_core_candidates(display):
+def find_core_candidates(display, color = [180, 255, 50]):
   lower_color = np.array([0, 0, 0])
-  upper_color = np.array([180, 255, 60])
+  upper_color = np.array(color)
 
   hsv = cv2.cvtColor(display, cv2.COLOR_BGR2HSV)
   smoothed = cv2.bilateralFilter(hsv, d=9, sigmaColor=20, sigmaSpace=20)
@@ -154,7 +154,11 @@ def find_core_candidates(display):
 
     crop = display[y1:y2, x1:x2]
     core_candidates.append(crop)
-  return core_candidates
+
+  if (color == [180, 255, 50]) and (not core_candidates):
+    return find_core_candidates(display, color=[180, 255, 30])
+  else:
+    return core_candidates
 
 def extract_enhanced_core_candidates(cores):
   lower_color = np.array([0, 0, 0])
@@ -176,17 +180,17 @@ def extract_enhanced_core_candidates(cores):
       enhanced_core_candidates.append(core)
   return enhanced_core_candidates
 
-def extract_core_icon_candidates(cores):
+def extract_core_icon_candidates(cores, upper_color = np.array([180, 255, 50])):
   size = 32
 
   lower_color = np.array([0, 0, 0])
-  upper_color = np.array([180, 255, 60])
 
   core_icon_candidates = []
   for core in cores:
     hsv = cv2.cvtColor(core, cv2.COLOR_BGR2HSV)
     smoothed = cv2.bilateralFilter(hsv, d=9, sigmaColor=20, sigmaSpace=20)
     masked = cv2.inRange(smoothed, lower_color, upper_color)
+
     contours, _ = cv2.findContours(masked, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
       continue
@@ -199,9 +203,8 @@ def extract_core_icon_candidates(cores):
     core_icon_candidates.append(crop)
   return core_icon_candidates
 
-def filter_valid_core_icons(icons):
+def filter_valid_core_icons(icons, upper_color = np.array([180, 255, 50])):
   lower_color = np.array([0, 0, 0])
-  upper_color = np.array([180, 255, 60])
 
   core_icons = []
   for icon in icons:
