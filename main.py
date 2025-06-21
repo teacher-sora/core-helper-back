@@ -135,7 +135,7 @@ def get_job_skills(job_class_path):
       skills.append({"icon": outlined_icon, "name": name})
   return skills
 
-def split_grouping_targets(contours, threshold=500):
+def split_grouping_targets(contours):
   grouping_targets = []
   standalone_targets = []
 
@@ -143,10 +143,12 @@ def split_grouping_targets(contours, threshold=500):
     x, y, w, h = cv2.boundingRect(c)
     area = w * h
 
-    if area < 24:
+    if len(c) < 3:
       continue
 
-    if area >= threshold:
+    aspect_ratio = float(w) / h if h != 0 else 0
+
+    if 0.8 <= aspect_ratio <= 1.2:
       standalone_targets.append(c)
     else:
       grouping_targets.append(c)
@@ -177,7 +179,7 @@ def group_nearby_contours(contours, threshold=70):
     groups.append(group)
   return groups
 
-def is_reasonable_box(x, y, w, h, min_area=500, aspect_range=(0.8, 1.2)):
+def is_reasonable_box(x, y, w, h, min_area=250, aspect_range=(0.8, 1.2)):
   if w * h < min_area:
     return False
   aspect_ratio = float(w) / h if h != 0 else 0
