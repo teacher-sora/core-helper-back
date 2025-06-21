@@ -78,7 +78,7 @@ async def process(images: list[UploadFile] = File(...), selected_job_class: str 
     if not cores:
       continue
 
-    enhanced_cores = extract_enhanced_core_candidates(cores)
+    enhanced_cores = filter_enhanced_core_candidates(cores)
     # print(f"enhanced_cores: {len(enhanced_cores)}")
     if not enhanced_cores:
       continue
@@ -135,31 +135,82 @@ def get_job_skills(job_class_path):
       skills.append({"icon": outlined_icon, "name": name})
   return skills
 
-def find_core_candidates(display, color = [180, 255, 50]):
+def split_grouping_targets(contours, threshold=500):
+  grouping_targets = []
+  standalone_targets = []
+
+  for c in contours:
+    x, y, w, h = cv2.boundingRect(c)
+    area = w * h
+
+    if area < 24:
+      continue
+
+    if area >= threshold:
+      standalone_targets.append(c)
+    else:
+      grouping_targets.append(c)
+  return grouping_targets, standalone_targets
+
+def get_center(rect):
+  x, y, w, h = rect
+  return (x + w/2, y + h/2)
+
+def group_nearby_contours(contours, threshold=70):
+  rects = [cv2.boundingRect(c) for c in contours]
+  centers = [get_center(r) for r in rects]
+  used = [False] * len(contours)
+  groups = []
+
+  for i in range(len(contours)):
+    if used[i]:
+      continue
+    group = [contours[i]]
+    used[i] = True
+    for j in range(i+1, len(contours)):
+      if used[j]:
+        continue
+      dist = np.linalg.norm(np.array(centers[i]) - np.array(centers[j]))
+      if dist < threshold:
+        group.append(contours[j])
+        used[j] = True
+    groups.append(group)
+  return groups
+
+def is_reasonable_box(x, y, w, h, min_area=500, aspect_range=(0.8, 1.2)):
+  if w * h < min_area:
+    return False
+  aspect_ratio = float(w) / h if h != 0 else 0
+  return aspect_range[0] <= aspect_ratio <= aspect_range[1]
+
+def find_core_candidates(display, color=[180, 255, 50]):
   lower_color = np.array([0, 0, 0])
   upper_color = np.array(color)
 
   hsv = cv2.cvtColor(display, cv2.COLOR_BGR2HSV)
-  smoothed = cv2.bilateralFilter(hsv, d=9, sigmaColor=20, sigmaSpace=20)
+  smoothed = cv2.bilateralFilter(hsv, d=5, sigmaColor=10, sigmaSpace=10)
   masked = cv2.inRange(smoothed, lower_color, upper_color)
   contours, _ = cv2.findContours(masked, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+  if not contours:
+    return []
 
   core_candidates = []
   padding = 20
   height, width = display.shape[:2]
-  for i, cnt in enumerate(contours):
-    x, y, w, h = cv2.boundingRect(cnt)
 
-    # 크기가 100보다 작으면 스킵
-    area = w * h
-    if area < 100:
+  grouping_targets, standalone_targets = split_grouping_targets(contours)
+  groups = group_nearby_contours(grouping_targets)
+
+  contour_groups = [group for group in groups if len(group) > 0] + [[c] for c in standalone_targets]
+
+  for group in contour_groups:
+    merged = np.vstack(group)
+    x, y, w, h = cv2.boundingRect(merged)
+
+    if not is_reasonable_box(x, y, w, h):
       continue
 
-    # 사각형이 아니면 스킵
-    aspect_ratio = float(w) / h
-    if not (0.8 <= aspect_ratio <= 1.2):
-      continue
-
+    # 🔹 패딩 포함 영역 계산
     x1 = max(x - padding, 0)
     y1 = max(y - padding, 0)
     x2 = min(x + w + padding, width)
@@ -168,12 +219,9 @@ def find_core_candidates(display, color = [180, 255, 50]):
     crop = display[y1:y2, x1:x2]
     core_candidates.append(crop)
 
-  if (color == [180, 255, 50]) and (not core_candidates):
-    return find_core_candidates(display, color=[180, 255, 30])
-  else:
-    return core_candidates
+  return core_candidates
 
-def extract_enhanced_core_candidates(cores):
+def filter_enhanced_core_candidates(cores):
   lower_color = np.array([0, 0, 0])
   upper_color = np.array([94, 115, 113])
 
@@ -193,31 +241,48 @@ def extract_enhanced_core_candidates(cores):
       enhanced_core_candidates.append(core)
   return enhanced_core_candidates
 
-def extract_core_icon_candidates(cores, upper_color = np.array([180, 255, 60])):
+def extract_core_icon_candidates(cores, color=[180, 255, 50]):
   size = 32
 
   lower_color = np.array([0, 0, 0])
+  upper_color = np.array(color)
 
   core_icon_candidates = []
   for core in cores:
     hsv = cv2.cvtColor(core, cv2.COLOR_BGR2HSV)
-    smoothed = cv2.bilateralFilter(hsv, d=9, sigmaColor=20, sigmaSpace=20)
+    smoothed = cv2.bilateralFilter(hsv, d=5, sigmaColor=10, sigmaSpace=10)
     masked = cv2.inRange(smoothed, lower_color, upper_color)
 
     contours, _ = cv2.findContours(masked, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
       continue
 
-    biggest = max(contours, key=cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(biggest)
+    grouping_targets, standalone_targets = split_grouping_targets(contours)
+    groups = group_nearby_contours(grouping_targets)
 
-    crop = core[y:y+h, x:x+w]
-    crop = cv2.resize(crop, (size, size))
-    core_icon_candidates.append(crop)
+    contour_groups = [group for group in groups if len(group) > 0] + [[c] for c in standalone_targets]
+
+    best_crop = None
+    best_area = 0
+    for group in contour_groups:
+      merged = np.vstack(group)
+      x, y, w, h = cv2.boundingRect(merged)
+
+      if not is_reasonable_box(x, y, w, h):
+        continue
+
+      area = w * h
+      if area > best_area:
+        best_area = area
+        best_crop = core[y:y+h, x:x+w]
+    if best_crop is not None:
+      best_crop = cv2.resize(best_crop, (size, size))
+      core_icon_candidates.append(best_crop)
   return core_icon_candidates
 
-def filter_valid_core_icons(icons, upper_color = np.array([180, 255, 60])):
+def filter_valid_core_icons(icons, color=[180, 255, 50]):
   lower_color = np.array([0, 0, 0])
+  upper_color = np.array(color)
 
   core_icons = []
   for icon in icons:
