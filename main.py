@@ -143,7 +143,9 @@ def split_grouping_targets(contours):
     x, y, w, h = cv2.boundingRect(c)
     area = w * h
 
-    if len(c) < 3:
+    if area < 24:
+      continue
+    elif len(c) < 2:
       continue
 
     aspect_ratio = float(w) / h if h != 0 else 0
