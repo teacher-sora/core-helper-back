@@ -21,6 +21,6 @@ primary_region = 'nrt'
   idle_timeout = "300s"
 
 [[vm]]
-  memory = '512mb'
+  memory = '768mb'
   cpu_kind = 'shared'
   cpus = 1
