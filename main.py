@@ -397,11 +397,13 @@ def analyze_icon(icon, skills):
       result = cv2.matchTemplate(icon_part, masked, cv2.TM_CCOEFF_NORMED)
       _, max_val, _, _ = cv2.minMaxLoc(result)
       match_results.append({"score": max_val, "skill": skill})
+      del result
     skills = [result["skill"] for result in match_results]
     scores = [result["score"] for result in match_results]
     max_score = max(scores)
     max_score_index = scores.index(max_score)
     matched_skills.append(skills[max_score_index])
+    del match_results
   
   skill_parts = [skill["icon"] for skill in matched_skills]
   skill_names = [skill["name"] for skill in matched_skills]
@@ -412,4 +414,7 @@ def analyze_icon(icon, skills):
   _, max_val, _, _ = cv2.minMaxLoc(result)
 
   detected_skill_names = skill_names if max_val > 0.625 else []
+  del result
+
+  gc.collect()
   return detected_skill_names
