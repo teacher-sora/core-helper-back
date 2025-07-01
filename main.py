@@ -72,6 +72,8 @@ async def process(images: list[UploadFile] = File(...), selected_job_class: str 
     content = await image.read()
     np_img = np.frombuffer(content, np.uint8)
     display = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+    if display is None:
+      continue
 
     cores = find_core_candidates(display)
     # print(f"cores: {len(cores)}")
