@@ -401,6 +401,9 @@ def analyze_icon(icon, skills):
     skills = [result["skill"] for result in match_results]
     scores = [result["score"] for result in match_results]
     max_score = max(scores)
+    if max_score < 0.625:
+      return []
+
     max_score_index = scores.index(max_score)
     matched_skills.append(skills[max_score_index])
     del match_results
