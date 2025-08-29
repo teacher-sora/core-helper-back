@@ -356,8 +356,7 @@ def split_icon(icon):
     for x in range(size):
       if triangle_mask[y, x] == 0:
         (canvas1 if x < 16 else canvas3)[y, x] = icon[y, x]
-  for center in range(3):
-    canvas2[:, :, center] = np.where(triangle_mask == 255, icon[:, :, center], canvas2[:, :, center])
+  canvas2 = np.where(triangle_mask == 255, icon, canvas2)
   return [canvas1, canvas2, canvas3]
 
 def merge_icon_parts(parts):
@@ -378,13 +377,14 @@ def merge_icon_parts(parts):
   return canvas
 
 def mask_icon(sample, icon):
-  mask = np.any(sample != 0, axis = -1)
+  mask = sample != 0
   canvas = np.zeros_like(sample)
   canvas[mask] = icon[mask]
   return canvas
 
 def analyze_icon(icon, skills):
-  icon_parts = split_icon(icon)
+  gray_icon = cv2.cvtColor(icon, cv2.COLOR_BGR2GRAY)
+  icon_parts = split_icon(gray_icon)
   matched_skills = []
   for icon_part in icon_parts:
     match_results = []
@@ -393,7 +393,8 @@ def analyze_icon(icon, skills):
         skill_names = [skill["name"] for skill in matched_skills]
         if skill["name"] in skill_names:
           continue
-      masked = mask_icon(icon_part, skill["icon"])
+      gray_skill = cv2.cvtColor(skill["icon"], cv2.COLOR_BGR2GRAY)
+      masked = mask_icon(icon_part, gray_skill)
       result = cv2.matchTemplate(icon_part, masked, cv2.TM_CCOEFF_NORMED)
       _, max_val, _, _ = cv2.minMaxLoc(result)
       match_results.append({"score": max_val, "skill": skill})
