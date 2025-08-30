@@ -46,16 +46,17 @@ async def core_helper(images: list[UploadFile] = File(...), selected_job_class: 
           "core_skill_names": processed.get("core_skill_names", [])
       })
   except asyncio.TimeoutError:
-    return JSONResponse(content={
+    return JSONResponse(status_code=500, content={
       "success": False,
-      "message": "요청 시간이 초과되었습니다."
+      "message": "요청 시간이 초과되었어요.\n같은 현상이 반복되면 관리자에게 문의해 주세요."
     })
   except Exception as e:
     import traceback
     traceback.print_exc()
 
     return JSONResponse(status_code=500, content={
-      "success": False
+      "success": False,
+      "message": "서버에 오류가 발생했어요.\n같은 현상이 반복되면 관리자에게 문의해 주세요."
     })
 
 async def process(images: list[UploadFile] = File(...), selected_job_class: str = Form(...)):
@@ -115,10 +116,15 @@ async def process(images: list[UploadFile] = File(...), selected_job_class: str 
   print(f"경과 시간[코어 분석]: {analyze_cores - find_cores:.3f}초, 분석된 코어: {len(detected_cores)}개")
   print(f"소요 시간: {analyze_cores - start_time:.3f}초")
 
-  if not detected_cores:
+  if not icons and not detected_cores:
     return {
       "success": False,
-      "message": "사용 가능한 코어가 없어요.\n잘못 입력한 게 있는지 확인해 주세요!"
+      "message": "이미지 화질이 낮아 코어 인식이 어려워요.\n게임 내 그래픽 설정을 높인 뒤 다시 시도해 주세요."
+    }
+  elif not detected_cores:
+    return {
+      "success": False,
+      "message": "코어가 분석되지 않았어요.\n게임 내 그래픽 설정을 높인 뒤 다시 시도해 주세요."
     }
   else:
     return {
